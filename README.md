@@ -27,7 +27,7 @@ Please contact the developers to be granted access to contribute directly, feel 
 [Glooey](https://glooey.readthedocs.io/en/latest/)
 
 # Support
-Contact William Greenlee on GitHub, or by email at greenlee04@gmail.com
+Contact William Greenlee on GitHub, or by [email](greenlee04@gmail.com)
 
 # Authors
 WGreenlee04 -- William Greenlee
