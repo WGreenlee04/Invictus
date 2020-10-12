@@ -2,7 +2,7 @@
 Server/Discord end of a Discord based roguelike/RPG that will incorporate both a lightweight Client application as well as a more heavy server to be run on a host machine that will also run a Discord bot on the game's Discord server.
 
 ## Motivation
-I have always been interested in creating games, and have recently made several Discord.py Discord bots. Why not mesh the two in a creative way?
+I have always been interested in creating games, and have recently made several Discord.py Discord bots. Why not mesh the two?
 
 ## Style
 [![Style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg?style=flat)](https://www.python.org/dev/peps/pep-0008/)
