@@ -374,7 +374,7 @@ class DisquidClient(discord.Client):
 
     def save(self):
         """
-        Goes through 
+        Goes through and calls save actions of the bot.
         """
         for fun in save_actions:
             fun(self)
