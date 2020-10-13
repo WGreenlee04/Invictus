@@ -1,5 +1,6 @@
-# Pycharm files
-.idea
+# Bot Instance Data
+data/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -11,6 +12,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.idea
 build/
 develop-eggs/
 dist/
