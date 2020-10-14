@@ -69,169 +69,168 @@ class Color:
     END = '\033[0m'
 
 
-class DisquidClient(discord.Client):
+def start():
     """
     Main body for the Discord Client interface for the project.
     Documentation Quick Reference https://discordpy.readthedocs.io/en/latest/api.html#
     """
 
+    client = discord.Client()
+
     default_prefix = '*'
     auto_save_duration = 300  # in seconds
     admins: []
 
-    def __init__(self, data_path: Path = Path('data/'), prefix_file_name: str = 'prefixes',
-                 admin_file_name: str = 'admins', player_file_name: str = 'players', game_file_name: str = 'games',
-                 **options):
-        super().__init__(**options)
-        self.data_path = data_path
-        self.prefix_file = data_path.joinpath(prefix_file_name + '.json')
-        self.admin_file = data_path.joinpath(admin_file_name + '.json')
-        self.player_file = data_path.joinpath(player_file_name + '.pickle')
-        self.game_file = data_path.joinpath(game_file_name + '.pickle')
+    data_path = Path('data/')
+    prefix_file = data_path.joinpath('prefixes.json')
+    admin_file = data_path.joinpath('admins.json')
+    player_file = data_path.joinpath('players.pickle')
+    game_file = data_path.joinpath('game.pickle')
 
-        # Data directory loading
-        if not os.path.exists(self.data_path):
-            os.mkdir(self.data_path)
+    # Data directory loading
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
 
-        # Prefix file loading
-        if not os.path.exists(self.prefix_file):
-            with open(self.prefix_file, 'w') as f:
-                json.dump({}, f)
-            self.prefixes: {int, str} = {}
-        else:
-            with open(self.prefix_file, 'r') as f:
-                temp: {} = json.load(f)
-                self.prefixes = {int(k): v for k, v in temp.items()}
+    # Prefix file loading
+    if not os.path.exists(prefix_file):
+        with open(prefix_file, 'w') as f:
+            json.dump({}, f)
+            prefixes: {int, str} = {}
+    else:
+        with open(prefix_file, 'r') as f:
+            temp: {} = json.load(f)
+            prefixes = {int(k): v for k, v in temp.items()}
 
-        # Admin id file loading:
-        if not os.path.exists(self.admin_file):
-            with open(self.admin_file, 'w') as f:
-                temp = [int(i) for i in input('Please give the starter admin(s)\'(s) '
-                                              'userID(s) separated by a comma and a space.').split(', ')]
-                json.dump(temp, f)
-            DisquidClient.admins = temp
-        else:
-            with open(self.admin_file, 'r') as f:
-                temp: [] = json.load(f)
-                DisquidClient.admins = [int(i) for i in temp]
+    # Admin id file loading:
+    if not os.path.exists(admin_file):
+        with open(admin_file, 'w') as f:
+            temp = [int(i) for i in input('Please give the starter admin(s)\'(s) '
+                                          'userID(s) separated by a comma and a space.').split(', ')]
+            json.dump(temp, f)
+            admins = temp
+    else:
+        with open(admin_file, 'r') as f:
+            temp: [] = json.load(f)
+            admins = [int(i) for i in temp]
 
-        # Player file loading
-        if not os.path.exists(self.player_file):
-            with open(self.player_file, 'wb') as f:
-                pickle.dump({}, f)
-            self.players: {int, Player} = {}
-        else:
-            with open(self.player_file, 'rb') as f:
-                self.players: {int, Player} = pickle.load(f)
+    # Player file loading
+    if not os.path.exists(player_file):
+        with open(player_file, 'wb') as f:
+            pickle.dump({}, f)
+            players: {int, Player} = {}
+    else:
+        with open(player_file, 'rb') as f:
+            players: {int, Player} = pickle.load(f)
 
-        # Active Game file loading
-        if not os.path.exists(self.game_file):
-            with open(self.game_file, 'wb') as f:
-                pickle.dump({}, f)
-            self.active_games: {int, Game} = {}
-        else:
-            with open(self.game_file, 'rb') as f:
-                self.active_games: {int, Game} = pickle.load(f)
+    # Active Game file loading
+    if not os.path.exists(game_file):
+        with open(game_file, 'wb') as f:
+            pickle.dump({}, f)
+            active_games: {int, Game} = {}
+    else:
+        with open(game_file, 'rb') as f:
+            active_games: {int, Game} = pickle.load(f)
 
-        # Adding auto save
-        async def auto_save(duration: int):
-            while True:
-                await asyncio.sleep(duration)
-                self.save()
+    # Adding auto save
+    async def auto_save(duration: int):
+        while True:
+            await asyncio.sleep(duration)
+            save()
 
-        asyncio.run_coroutine_threadsafe(auto_save(DisquidClient.auto_save_duration), asyncio.get_event_loop())
+    asyncio.run_coroutine_threadsafe(auto_save(auto_save_duration), asyncio.get_event_loop())
+    client.start(input('Bot API Token: '))
 
-    def get_prefix(self, gid: discord.Guild.id):
+    def get_prefix(gid: discord.Guild.id):
         """
         Returns the prefix for a given guild.
         :return: The prefix of the given guild.
         """
         try:
-            return self.prefixes[gid]
+            return prefixes[gid]
         except KeyError:  # in case of failure of the on_guild_join event
-            self.prefixes[gid] = self.default_prefix
-            return self.default_prefix
+            prefixes[gid] = default_prefix
+            return default_prefix
 
     @save_action
-    def save_prefixes(self):
+    def save_prefixes():
         """
         Saves current dict of prefixes to a file using JSON.
         """
-        with open(self.prefix_file, 'w') as f:
+        with open(prefix_file, 'w') as f:
             f.truncate(0)
-            json.dump(self.prefixes, f, indent=4)
+            json.dump(prefixes, f, indent=4)
 
     @save_action
-    def save_admins(self):
+    def save_admins():
         """
         Saves current dict of prefixes to a file using JSON.
         """
-        with open(self.admin_file, 'w') as f:
+        with open(admin_file, 'w') as f:
             f.truncate(0)
-            json.dump(DisquidClient.admins, f, indent=4)
+            json.dump(admins, f, indent=4)
 
     @save_action
-    def save_players(self):
+    def save_players():
         """
         Saves current dict of players to a file using pickle.
         """
-        with open(self.player_file, 'wb') as f:
+        with open(player_file, 'wb') as f:
             f.truncate(0)
-            pickle.dump(self.players, f)
+            pickle.dump(players, f)
 
     @save_action
-    def save_game(self):
+    def save_game():
         """
         Saves current state of all levels to a file using pickle.
         """
-        with open(self.game_file, 'wb') as f:
+        with open(game_file, 'wb') as f:
             f.truncate(0)
-            pickle.dump(self.active_games, f)
+            pickle.dump(active_games, f)
 
-    async def on_ready(self):
+    async def on_ready():
         """
         Called when bot is setup and ready.
         Put any startup actions here.
         """
         print(f'DungeonController {__version__} ready.')
 
-    async def on_guild_join(self, guild: discord.Guild):
+    async def on_guild_join(guild: discord.Guild):
         """
         This is called when the bot is invited to and joins a new "server".
         :param guild: Guild Class joined found at https://discordpy.readthedocs.io/en/latest/api.html#guild.
         """
-        self.prefixes[guild.id] = self.default_prefix
+        prefixes[guild.id] = default_prefix
 
-    async def on_guild_leave(self, guild: discord.Guild):
+    async def on_guild_leave(guild: discord.Guild):
         """
         This is called when a bot leaves a "server".
         :param guild: Guild Class joined found at https://discordpy.readthedocs.io/en/latest/api.html#guild.
         """
-        del self.prefixes[guild.id]
+        del prefixes[guild.id]
 
-    async def on_message(self, message: discord.Message):
+    async def on_message(message: discord.Message):
         """
         Called when a message is sent in a channel available to the bot.
         :param message: Message Class found at https://discordpy.readthedocs.io/en/latest/api.html#message.
         """
 
-        if not self.is_ready() or not message.content or message.author.bot:
+        if not client.is_ready() or not message.content or message.author.bot:
             return
 
-        prefix = self.get_prefix(message.guild.id)
+        prefix = get_prefix(message.guild.id)
         if len(str(message.content)) >= len(prefix) and prefix == str(message.content)[:len(prefix)]:
             cmd = str(message.content).strip(prefix).split()[0].lower()
             try:
-                await commands[cmd](self, message=message)
+                await commands[cmd](message=message)
             except KeyError:
                 print('User tried nonexistent command')
 
     @command(['help', 'h'])
-    async def help_command(self, message: discord.Message):
+    async def help_command(message: discord.Message):
         """
         [*, moves, tiles] Provides descriptions of commands.
         """
-        is_admin = message.author.id in DisquidClient.admins
+        is_admin = message.author.id in admins
         processed_message = str(message.content).split()
         del processed_message[0]
         if len(processed_message) == 0:
@@ -257,14 +256,14 @@ class DisquidClient(discord.Client):
             pass #other cases
 
     @command()
-    async def ping(self, message: discord.Message):
+    async def ping(message: discord.Message):
         """
         PONG! Sends the bot's latency.
         """
-        await message.channel.send(f'{self.latency * 1000}ms')
+        await message.channel.send(f'{client.latency * 1000}ms')
 
     @command(['changeprefix', 'cp'])
-    async def change_prefix(self, message: discord.Message):
+    async def change_prefix(message: discord.Message):
         """
         [prefix] Usable by admins to change the bot's server prefix.
         """
@@ -274,43 +273,43 @@ class DisquidClient(discord.Client):
             if len(processed_message) == 0:
                 await message.channel.send('No prefix argument provided.')
                 return
-            self.prefixes.pop(message.guild.id)
-            self.prefixes[message.guild.id] = processed_message[0]
+            prefixes.pop(message.guild.id)
+            prefixes[message.guild.id] = processed_message[0]
             await message.guild.me.edit(nick=f'[{processed_message[0]}] ' + str(message.guild.me.name))
             await message.channel.send(f'Prefix is now \'{processed_message[0]}\'')
         else:
             await message.channel.send('Only administrators may do this.')
 
     @command(['profile'])
-    async def player_profile(self, message: discord.Message):
+    async def player_profile(message: discord.Message):
         """
         [@mention/name] views a given player's profile.
         """
         pass
 
     @command(['top'])
-    async def leaderboard(self, message: discord.Message):
+    async def leaderboard(message: discord.Message):
         """
         Displays the top 10 players worldwide.
         """
         pass
 
     @command(['c'])
-    async def challenge(self, message: discord.Message):
+    async def challenge(message: discord.Message):
         """
         [@mention/name] Initiates a challenge against another player.
         """
         pass
 
     @command(['a'])
-    async def accept(self, message: discord.Message):
+    async def accept(message: discord.Message):
         """
         [@mention/name] Accepts an existing challenge from another user.
         """
         pass
 
     @command(['changename', 'name'])
-    async def change_name(self, message: discord.Message):
+    async def change_name(message: discord.Message):
         """
         [name] Changes the name of the user who sends the message,
         as well as all of the user's custom emoji.
@@ -318,12 +317,12 @@ class DisquidClient(discord.Client):
         pass
 
     @command(['save'], True)
-    async def save_command(self, message: discord.Message = None):
+    async def save_command(message: discord.Message = None):
         """
         Called by a bot admin to save all files in the bot.
         """
-        if message.author.id in DisquidClient.admins:
-            self.save()
+        if message.author.id in admins:
+            save()
             await message.channel.send('Save Successful.')
         else:
             await message.channel.send('Insufficient user permissions.')
@@ -333,24 +332,24 @@ class DisquidClient(discord.Client):
         """
         Called by a bot admin to exit the bot.
         """
-        if message.author.id in DisquidClient.admins:
+        if message.author.id in admins:
             await message.channel.send('Shutting down.')
-            await self.close()
+            await close()
         else:
             await message.channel.send('Insufficient user permissions')
 
     @command(['op'], True)
-    async def promote(self, message: discord.Message):
+    async def promote(message: discord.Message):
         """
         [@mention] Called by a bot admin to promote a new bot admin.
         """
-        if message.author.id in DisquidClient.admins:
+        if message.author.id in admins:
             mentions = message.mentions
             if len(mentions) == 0:
                 await message.channel.send('No argument provided!')
             for mention in mentions:
-                if mention.id not in DisquidClient.admins:
-                    DisquidClient.admins.append(mention.id)
+                if mention.id not in admins:
+                    admins.append(mention.id)
                     await message.channel.send(f'<@{mention.id}> is now an admin.')
                 else:
                     await message.channel.send(f'<@{mention.id}> was already an admin!')
@@ -363,27 +362,27 @@ class DisquidClient(discord.Client):
         [@mention] Called by a bot admin to promote a new bot admin.
         """
         mentions = message.mentions
-        if message.author.id in DisquidClient.admins:
+        if message.author.id in admins:
             if len(mentions) == 0:
                 await message.channel.send('No argument provided!')
             for mention in mentions:
-                DisquidClient.admins.remove(mention.id)
+                admins.remove(mention.id)
                 await message.channel.send(f'@<{mention.id}> is no longer an admin.')
         else:
             await message.channel.send('Insufficient user permissions.')
 
-    def save(self):
+    def save():
         """
         Goes through and calls save actions of the bot.
         """
         for fun in save_actions:
-            fun(self)
+            fun()
         return
 
-    async def close(self):
-        self.save()
-        await super(DisquidClient, self).close()
+    async def close():
+        save()
+        await client.close()
 
 
 if __name__ == '__main__':
-    DisquidClient().run(input('Bot API Token: '))
+    start()
