@@ -1,5 +1,5 @@
 # Invictus
-A Discord based roguelike/RPG that incorporates both a lightweight Client application as well as a more heavy server to be run on a host machine that will also interface with a Discord bot on the game's Discord server for Discord integration.
+Invictus, also known as Descensus Invictus, is a Discord based roguelike/RPG that incorporates both a lightweight Client application as well as a more heavy server to be run on a host machine that will also interface with a Discord bot on the game's Discord server for Discord integration.
 
 ## Motivation
 I have always been interested in creating games, and have recently made several Discord.py Discord bots. Why not mesh the two?
