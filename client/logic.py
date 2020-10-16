@@ -1,193 +1,248 @@
-import math
+from math import floor
+from typing import Tuple
 
 import pyglet
+from collision import collide, Response, Vector, Circle, Poly
+from pyglet.window import key
+from pyglet.window.key import KeyStateHandler
 
-Dimenstions = (int, int)
-
-""" 
-The MIT License (MIT)
-Copyright (c) 2015 Mat Leonard
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-"""
+Cell = [int, int]
 
 
-class Vector(object):
-    def __init__(self, *args):
-        """ Create a vector, example: v = Vector(1,2) """
-        if len(args) == 0:
-            self.values = (0, 0)
-        else:
-            self.values = args
+class KeyMap:
+    defaults = {
+        'up': key.W,
+        'down': key.S,
+        'left': key.A,
+        'right': key.D
+    }
 
-    def norm(self):
-        """ Returns the norm (length, magnitude) of the vector """
-        return math.sqrt(sum(comp ** 2 for comp in self))
-
-    def argument(self):
-        """ Returns the argument of the vector, the angle clockwise from +y."""
-        arg_in_rad = math.acos(Vector(0, 1) * self / self.norm())
-        arg_in_deg = math.degrees(arg_in_rad)
-        if self.values[0] < 0:
-            return 360 - arg_in_deg
-        else:
-            return arg_in_deg
-
-    def normalize(self):
-        """ Returns a normalized unit vector """
-        norm = self.norm()
-        normed = tuple(comp / norm for comp in self)
-        return Vector(*normed)
-
-    def rotate(self, *args):
-        """ Rotate this vector. If passed a number, assumes this is a
-            2D vector and rotates by the passed value in degrees.  Otherwise,
-            assumes the passed value is a list acting as a matrix which rotates the vector.
-        """
-        if len(args) == 1 and isinstance(args[0], int) or isinstance(args[0], float):
-            # So, if rotate is passed an int or a float...
-            if len(self) != 2:
-                raise ValueError("Rotation axis not defined for greater than 2D vector")
-            return self._rotate2D(*args)
-        elif len(args) == 1:
-            matrix = args[0]
-            if not all(len(row) == len(matrix) for row in matrix) or not len(matrix) == len(self):
-                raise ValueError("Rotation matrix must be square and same dimensions as vector")
-            return self.matrix_mult(matrix)
-
-    def _rotate2D(self, theta):
-        """ Rotate this vector by theta in degrees.
-
-            Returns a new vector.
-        """
-        theta = math.radians(theta)
-        # Just applying the 2D rotation matrix
-        dc, ds = math.cos(theta), math.sin(theta)
-        x, y = self.values
-        x, y = dc * x - ds * y, ds * x + dc * y
-        return Vector(x, y)
-
-    def matrix_mult(self, matrix):
-        """ Multiply this vector by a matrix.  Assuming matrix is a list of lists.
-
-            Example:
-            mat = [[1,2,3],[-1,0,1],[3,4,5]]
-            Vector(1,2,3).matrix_mult(mat) ->  (14, 2, 26)
-
-        """
-        if not all(len(row) == len(self) for row in matrix):
-            raise ValueError('Matrix must match vector dimensions')
-
-            # Grab a row from the matrix, make it a Vector, take the dot product,
-        # and store it as the first component
-        product = tuple(Vector(*row) * self for row in matrix)
-
-        return Vector(*product)
-
-    def inner(self, other):
-        """ Returns the dot product (inner product) of self and other vector
-        """
-        return sum(a * b for a, b in zip(self, other))
-
-    def __mul__(self, other):
-        """ Returns the dot product of self and other if multiplied
-            by another Vector.  If multiplied by an int or float,
-            multiplies each component by other.
-        """
-        if isinstance(other, type(self)):
-            return self.inner(other)
-        elif isinstance(other, int) or isinstance(other, float):
-            product = tuple(a * other for a in self)
-            return Vector(*product)
-
-    def __rmul__(self, other):
-        """ Called if 4*self for instance """
-        return self.__mul__(other)
-
-    def __div__(self, other):
-        if isinstance(other, int) or isinstance(other, float):
-            divided = tuple(a / other for a in self)
-            return Vector(*divided)
-
-    def __add__(self, other):
-        """ Returns the vector addition of self and other """
-        added = tuple(a + b for a, b in zip(self, other))
-        return Vector(*added)
-
-    def __sub__(self, other):
-        """ Returns the vector difference of self and other """
-        subbed = tuple(a - b for a, b in zip(self, other))
-        return Vector(*subbed)
-
-    def __iter__(self):
-        return self.values.__iter__()
-
-    def __len__(self):
-        return len(self.values)
-
-    def __getitem__(self, key):
-        return self.values[key]
-
-    def __repr__(self):
-        return str(self.values)
+    def __init__(self, up, down, left, right):
+        self.up = up
+        self.down = down
+        self.left = left
+        self.right = right
 
 
 class Asset(pyglet.sprite.Sprite):
+    """
+    Anything that is drawn onto the screen that isn't an overlay.
+    """
 
-    def __init__(self, path: str, *args, **kwargs):
-        img = pyglet.resource.image(path)
-        img.anchor_x = img.width // 2
-        img.anchor_y = img.height // 2
-        super(Asset, self).__init__(img=img, *args, **kwargs)
+    def __init__(self, rel_pos_vector: Vector, window_width: int, window_height: int,
+                 image_path: str = None, desired_width: float = None, desired_height: float = None, *args, **kwargs):
+        """
+        :param rel_pos_vector: relative position to the top left corner of the screen
+        and bottom left corner of the screen as a Vector of type collisions.Vector.
+        :param window_width: width of the window the Asset is in.
+        :param window_height: height of the window the Asset is in.
+        :param image_path: path to the image file from the pyglet search directory nearest it.
+        """
+        if image_path:
+            img = pyglet.resource.image(image_path)
+            img.anchor_x = img.width // 2
+            img.anchor_y = img.height // 2
+        elif (len(args) > 0 and args[0]) or 'img' in kwargs:
+            img = args[0] if len(args) > 0 and args[0] else kwargs['img']
+        else:
+            raise InvalidArguments
+        self._rel_vector = rel_pos_vector
+        x = rel_pos_vector.x * window_width / 16
+        y = rel_pos_vector.y * window_height / 9
+        super(Asset, self).__init__(img=img, x=x, y=y, *args, **kwargs)
+        if desired_width:
+            self.scale_x = desired_width * window_width / self.image.width / 16
+        if desired_height:
+            self.scale_y = desired_height * window_height / self.image.height / 9
+
+    @property
+    def rel_vector(self):
+        return self._rel_vector
+
+    @property
+    def rel_x(self):
+        return self._rel_vector.x
+
+    @property
+    def rel_y(self):
+        return self._rel_vector.y
+
+    def set_rel_vector(self, rel_vector: Vector, window_width: int, window_height: int):
+        self._rel_vector = rel_vector
+        self.x = int(rel_vector.x * window_width / 16)
+        self.y = int(rel_vector.y * window_height / 9)
+
+    def set_rel_x(self, rel_x: float, window_width: int):
+        self._rel_vector.x = rel_x
+        self.x = int(rel_x * window_width / 16)
+
+    def set_rel_y(self, rel_y: float, window_height: int):
+        self._rel_vector.y = rel_y
+        self.y = int(rel_y * window_height / 9)
 
 
 class Collidable(Asset):
+    """
+    Anything that can collide with other objects on screen.
+    """
 
-    def __int__(self, width=None, height=None, radius=None, *args, **kwargs):
-        super(Collidable, self).__int__(*args, **kwargs)
+    cell_width = 16 / 6
+    cell_height = 9 / 6
 
-        if radius and not (width or height):
-            self.mode: int = Mode.circle
-            self.radius: int = radius
-        elif width and height:
-            self.mode: int = Mode.rectangle
-            self.dimensions: Dimenstions = (width, height)
+    def __init__(self, points: Tuple[Tuple[float]] = None, radius: float = None, *args, **kwargs):
+        """
+        :param points: A tuple of tuples of floats (x,y) that describes the boundary using relative coordinates from the
+         top left most point going clockwise around the perimeter. Object becomes a polygon or point.
+        :param radius: A relative coordinate describing the radius of a circular boundary from the center of the object.
+        Object becomes a circle.
+        """
+        super(Collidable, self).__init__(*args, **kwargs)
+        if radius and not points:
+            self.collider = Circle(self.rel_vector, radius)
+        elif points and len(points) != 1:
+            self.collider = Poly(self.rel_vector, points)
+        elif points:
+            self.collider = None
         else:
-            raise InvalidArguments
+            if (len(args) > 1 and args[1]) or 'window_width' in kwargs:
+                width = args[1] if len(args) > 1 and args[1] else kwargs['window_width']
+            else:
+                raise InvalidArguments
+            if (len(args) > 2 and args[2]) or 'window_height' in kwargs:
+                height = args[2] if len(args) > 2 and args[2] else kwargs['window_height']
+            else:
+                raise InvalidArguments
+            self.collider = Poly(self.rel_vector,
+                                 (
+                                     Vector(self.image.width / width * 16 + self.rel_x,
+                                            self.image.height / height * 9 + self.rel_y),
+                                     Vector(self.image.width / width * 16 + self.rel_x,
+                                            -self.image.height / height * 9 + self.rel_y),
+                                     Vector(-self.image.width / width * 16 + self.rel_x,
+                                            -self.image.height / height * 9 + self.rel_y),
+                                     Vector(-self.image.width / width * 16 + self.rel_x,
+                                            self.image.height / height * 9 + self.rel_y)))
+
+    @property
+    def cells(self) -> [int, int]:
+        """
+        Gives the row and column of the cell(s) that this object is in. Used for collision detection.
+        """
+        if not self.collider:
+            result = [[floor(self.rel_x / Collidable.cell_width), floor(self.rel_y / Collidable.cell_height)]]
+        elif isinstance(self.collider, Poly):
+            result = []
+            for point in self.collider.points:
+                temp = [floor(point[0] / Collidable.cell_width), floor(point[1] / Collidable.cell_height)]
+                if temp not in result:
+                    result.append(temp)
+        elif isinstance(self.collider, Circle):
+            points = [self.rel_vector + Vector(0, self.collider.radius),
+                      self.rel_vector + Vector(self.collider.radius, 0),
+                      self.rel_vector + Vector(0, -self.collider.radius),
+                      self.rel_vector + Vector(-self.collider.radius, 0)]
+            result = []
+            for point in points:
+                temp = [floor(point[0] / Collidable.cell_width), floor(point[1] / Collidable.cell_height)]
+                if temp not in result:
+                    result.append(temp)
+        else:
+            return None
+        return result
+
+    def is_colliding(self, other):
+        """
+        Returns a collision response if the two objects are colliding, else returns None.
+        """
+        if isinstance(other, Collidable):
+            resp = Response()
+            if self.collider:
+                if other.collider:
+                    result = collide(self.collider, other.collider, resp)
+                else:
+                    result = collide(self.collider, other.rel_vector, resp)
+            else:
+                if other.collider:
+                    result = collide(self.rel_vector, other.collider, resp)
+                else:
+                    result = collide(self.rel_vector, other.rel_vector, resp)
+        else:
+            return NotImplemented
+        return resp if result else None
 
 
 class PhysicsBody(Collidable):
+    """
+    Any object that experiences full game physics, not just collisions.
+    """
 
-    def __init__(self, dx: Vector = Vector(0, 0), d2x: Vector = Vector(0, 0),
-                 d3x: Vector = Vector(0,0), *args, **kwargs):
+    def __init__(self, dx: Vector = Vector(0, 0), d2x: Vector = Vector(0, 0), mass: float = 1, *args, **kwargs):
+        """
+        :param dx: velocity of the object at state 1, given with relative coordinates.
+        :param d2x: acceleration of the object at state 1, given with relative coordinates.
+        :param mass: mass given in mass relative to player (player mass = 1)
+        """
         super(PhysicsBody, self).__init__(*args, **kwargs)
-        self.dx = dx
-        self.d2x = d2x
-        self.d3x = d3x
+        self.dx: Vector = dx
+        self.d2x: Vector = d2x
+        self.mass: float = mass
+
+    def on_update(self, dt: float, window_width: int, window_height: int):
+        self.dx += self.d2x * dt
+        self.set_rel_x(self.rel_x + self.dx[0] * dt, window_width)
+        self.set_rel_y(self.rel_y + self.dx[1] * dt, window_height)
+        for loc in self.collider.points:
+            loc += self.dx
+
+    def impulse(self, force: Vector, dt: float):
+        self.dx += force * dt / self.mass
+
 
 class Player(PhysicsBody):
+    """
+    A physics body that can be moved by a user.
+    """
 
-    def __init__(self, health: int = 100, *args, **kwargs):
+    def __init__(self, health: int = 100, speed: float = 2,
+                 key_map: KeyMap = KeyMap(**KeyMap.defaults), *args, **kwargs):
+        """
+        :param health: health, an integer, defaults to 100.
+        """
         super(Player, self).__init__(*args, **kwargs)
-        self.health = health
+        self.key_handler = KeyStateHandler()
+        self.key_binds = key_map
+        self._health = health
+        self.speed = speed  # measured in relative coords/sec
+        self.dead = False
 
+    @property
+    def health(self):
+        """
+        The strength of life force keeping the user bound to their player.
+        """
+        return self._health
 
-class Mode(int):
-    rectangle = 0
-    circle = 1
+    @health.setter
+    def health(self, health):
+        if health < 0:
+            health = 0
+            self.dead = True
+        self._health = health
+
+    def on_update(self, dt: float, window_width: int, window_height: int):
+        handler = self.key_handler
+        binds = self.key_binds
+        vec = Vector(0, 0)
+        if handler[binds.up]:
+            vec += Vector(0, 1)
+        if handler[binds.down]:
+            vec += Vector(0, -1)
+        if handler[binds.right]:
+            vec += Vector(1, 0)
+        if handler[binds.left]:
+            vec += Vector(-1, 0)
+        self.dx = vec * self.speed
+        super(Player, self).on_update(dt, window_width, window_height)
 
 
 class InvalidArguments(Exception):

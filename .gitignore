@@ -1,5 +1,7 @@
 # Bot Instance Data
 data/
+client/resources/config.ini
+client/resources/levels
 
 
 # Byte-compiled / optimized / DLL files
